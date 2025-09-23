@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mid-Queue 🏥 - Healthcare Queue Management</title>
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://unpkg.com/phosphor-icons@1.4.2/src/css/phosphor.css" rel="stylesheet">
+    
+    <script src="https://www.gstatic.com/firebasejs/9.0.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.0.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.0.0/firebase-firestore-compat.js"></script>
+
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="floating-particles" id="particles"></div>
+    
+    <div id="app" class="min-h-screen relative z-10">
+        <div id="homePage" class="min-h-screen flex items-center justify-center p-6">
+            <div class="max-w-lg w-full text-center fade-in">
+                <div class="mb-12">
+                    <div class="glass-strong rounded-3xl p-12 mb-8 hover-scale">
+                        <div class="text-8xl mb-6 logo-glow">🏥</div>
+                        <h1 class="text-5xl font-bold text-white glow-text mb-4">Mid-Queue</h1>
+                        <p class="text-white/80 text-xl font-light">Healthcare Queue Management</p>
+                    </div>
+                </div>
+
+                <div class="space-y-6">
+                    <button onclick="loginUser('patient')" class="w-full glass-strong rounded-2xl p-8 text-white font-semibold text-xl transition-all duration-300 btn-ripple hover-scale group">
+                        <div class="flex items-center justify-center space-x-4">
+                            <i class="ph-user-circle text-3xl group-hover:scale-110 transition-transform"></i>
+                            <span>Patient Portal</span>
+                            <i class="ph-arrow-right text-2xl group-hover:translate-x-2 transition-transform"></i>
+                        </div>
+                    </button>
+                    
+                    <div class="glass-strong rounded-2xl p-8 text-left">
+                        <h3 class="text-white text-xl font-semibold mb-4 text-center">Doctor Login</h3>
+                        <form id="doctorLoginForm" class="space-y-4">
+                            <div>
+                                <label class="block text-white/80 font-medium mb-2 text-sm">Email</label>
+                                <input type="email" id="doctorEmail" required class="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-xl text-white placeholder-white/50 focus:ring-2 focus:ring-blue-400 focus:border-transparent backdrop-blur-sm">
+                            </div>
+                            <div>
+                                <label class="block text-white/80 font-medium mb-2 text-sm">Password</label>
+                                <input type="password" id="doctorPassword" required class="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-xl text-white placeholder-white/50 focus:ring-2 focus:ring-blue-400 focus:border-transparent backdrop-blur-sm">
+                            </div>
+                            <button type="submit" class="w-full glass rounded-xl py-3 text-white font-semibold text-lg btn-ripple hover-scale transition-all duration-300">
+                                <i class="ph-sign-in mr-2"></i>Sign In
+                            </button>
+                        </form>
+                    </div>
+                </div>
+
+                <div class="mt-12 text-white/60 text-sm">
+                    <p class="flex items-center justify-center space-x-4">
+                        <span>🔒 Secure</span>
+                        <span>⚡ Fast</span>
+                        <span>🎯 Reliable</span>
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        <div id="patientPage" class="hidden min-h-screen p-6">
+            <header class="glass rounded-2xl p-6 mb-8 fade-in">
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center space-x-4">
+                        <i class="ph-user-circle text-3xl text-white"></i>
+                        <div>
+                            <h1 class="text-2xl font-bold text-white">Patient Portal</h1>
+                            <p class="text-white/70" id="patientName">Welcome back!</p>
+                        </div>
+                    </div>
+                    <button onclick="logout()" class="glass rounded-xl px-6 py-3 text-white font-medium hover-scale">
+                        <i class="ph-arrow-left mr-2"></i>Back to Home
+                    </button>
+                </div>
+            </header>
+
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                <div class="glass-strong rounded-2xl p-8 slide-up">
+                    <h2 class="text-2xl font-bold text-white mb-6 flex items-center">
+                        <i class="ph-plus-circle mr-3 text-3xl"></i>
+                        Check-In Form
+                    </h2>
+                    
+                    <form id="checkInForm" class="space-y-6">
+                        <div>
+                            <label class="block text-white/80 font-medium mb-2">Full Name</label>
+                            <input type="text" id="patientNameInput" required 
+                                   class="w-full px-4 py-4 bg-white/10 border border-white/20 rounded-xl text-white placeholder-white/50 focus:ring-2 focus:ring-blue-400 focus:border-transparent backdrop-blur-sm">
+                        </div>
+                        
+                        <div>
+                            <label class="block text-white/80 font-medium mb-2">Age</label>
+                            <input type="number" id="patientAge" required min="1" max="120"
+                                   class="w-full px-4 py-4 bg-white/10 border border-white/20 rounded-xl text-white placeholder-white/50 focus:ring-2 focus:ring-blue-400 focus:border-transparent backdrop-blur-sm">
+                        </div>
+                        
+                        <div>
+                            <label class="block text-white/80 font-medium mb-2">Reason for Visit</label>
+                            <textarea id="visitReason" required rows="3"
+                                      class="w-full px-4 py-4 bg-white/10 border border-white/20 rounded-xl text-white placeholder-white/50 focus:ring-2 focus:ring-blue-400 focus:border-transparent backdrop-blur-sm"
+                                      placeholder="Describe your symptoms or reason for visit..."></textarea>
+                        </div>
+
+                        <div id="emergencySection" class="glass rounded-xl p-6 transition-all duration-300">
+                            <div class="flex items-center justify-between">
+                                <div class="flex items-center space-x-4">
+                                    <i class="ph-warning text-3xl text-red-400"></i>
+                                    <div>
+                                        <h4 class="font-semibold text-white text-lg">Emergency Priority</h4>
+                                        <p class="text-white/70 text-sm">Toggle for urgent medical situations</p>
+                                    </div>
+                                </div>
+                                <label class="relative inline-flex items-center cursor-pointer">
+                                    <input type="checkbox" id="emergencyToggle" class="sr-only peer">
+                                    <div class="w-16 h-9 bg-white/20 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-red-300/50 rounded-full peer peer-checked:after:translate-x-7 peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-8 after:w-8 after:transition-all peer-checked:bg-gradient-to-r peer-checked:from-red-500 peer-checked:to-pink-500"></div>
+                                </label>
+                            </div>
+                        </div>
+
+                        <button type="submit" class="w-full glass-strong rounded-xl py-4 text-white font-semibold text-lg btn-ripple hover-scale transition-all duration-300">
+                            <i class="ph-check-circle mr-2"></i>Join Queue
+                        </button>
+                    </form>
+                </div>
+
+                <div class="glass-strong rounded-2xl p-8 slide-up">
+                    <h2 class="text-2xl font-bold text-white mb-6 flex items-center">
+                        <i class="ph-queue mr-3 text-3xl"></i>
+                        Live Queue Status
+                    </h2>
+                    
+                    <div id="queueTracker" class="space-y-4">
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div id="doctorPage" class="hidden min-h-screen p-6">
+            <header class="glass rounded-2xl p-6 mb-8 fade-in">
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center space-x-4">
+                        <i class="ph-stethoscope text-3xl text-white"></i>
+                        <div>
+                            <h1 class="text-2xl font-bold text-white">Doctor Dashboard</h1>
+                            <p class="text-white/70" id="doctorName">Dr. Smith</p>
+                        </div>
+                    </div>
+                    <div class="flex items-center space-x-4">
+                        <button onclick="showHistory()" class="glass rounded-xl px-6 py-3 text-white font-medium hover-scale">
+                            <i class="ph-clock-clockwise mr-2"></i>History
+                        </button>
+                        <button onclick="logout()" class="glass rounded-xl px-6 py-3 text-white font-medium hover-scale">
+                            <i class="ph-sign-out mr-2"></i>Logout
+                        </button>
+                    </div>
+                </div>
+            </header>
+
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+                <div class="glass rounded-2xl p-6 text-center fade-in">
+                    <i class="ph-users text-4xl text-white mb-3"></i>
+                    <div class="text-3xl font-bold text-white" id="totalPatients">0</div>
+                    <p class="text-white/70">Total Queue</p>
+                </div>
+                <div class="glass rounded-2xl p-6 text-center fade-in">
+                    <i class="ph-warning text-4xl text-red-400 mb-3"></i>
+                    <div class="text-3xl font-bold text-white" id="emergencyCount">0</div>
+                    <p class="text-white/70">Emergency</p>
+                </div>
+                <div class="glass rounded-2xl p-6 text-center fade-in">
+                    <i class="ph-clock text-4xl text-white mb-3"></i>
+                    <div class="text-3xl font-bold text-white" id="avgWaitTime">0</div>
+                    <p class="text-white/70">Avg Wait (min)</p>
+                </div>
+                <div class="glass rounded-2xl p-6 text-center fade-in">
+                    <i class="ph-check-circle text-4xl text-green-400 mb-3"></i>
+                    <div class="text-3xl font-bold text-white" id="completedToday">0</div>
+                    <p class="text-white/70">Completed Today</p>
+                </div>
+            </div>
+
+            <div class="glass-strong rounded-2xl overflow-hidden slide-up">
+                <div class="p-6 border-b border-white/10">
+                    <h2 class="text-2xl font-bold text-white flex items-center">
+                        <i class="ph-list-bullets mr-3 text-3xl"></i>
+                        Patient Queue
+                    </h2>
+                </div>
+                
+                <div id="patientQueue" class="divide-y divide-white/10">
+                </div>
+            </div>
+        </div>
+
+        <div id="historyPage" class="hidden min-h-screen p-6">
+            <header class="glass rounded-2xl p-6 mb-8 fade-in">
+                <div class="flex items-center space-x-4">
+                    <button onclick="backToDashboard()" class="glass rounded-xl p-3 text-white hover-scale">
+                        <i class="ph-arrow-left text-xl"></i>
+                    </button>
+                    <div>
+                        <h1 class="text-2xl font-bold text-white">Visit History</h1>
+                        <p class="text-white/70">Completed appointments</p>
+                    </div>
+                </div>
+            </header>
+
+            <div id="historyGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            </div>
+        </div>
+
+        <div id="loadingOverlay" class="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 hidden">
+            <div class="glass-strong rounded-2xl p-8 text-center">
+                <div class="animate-spin text-4xl mb-4">⚕️</div>
+                <p class="text-white font-medium">Loading...</p>
+            </div>
+        </div>
+
+        <div id="notificationToast" class="fixed top-6 right-6 glass-strong rounded-2xl p-6 text-white shadow-2xl hidden z-50 slide-up max-w-sm">
+            <div class="flex items-center space-x-4">
+                <i id="toastIcon" class="ph-check-circle text-2xl text-green-400"></i>
+                <div>
+                    <p id="toastTitle" class="font-semibold">Success!</p>
+                    <p id="toastMessage" class="text-white/70 text-sm">Operation completed successfully</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
