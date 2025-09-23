@@ -15,7 +15,7 @@ let currentRole = null;
 let queueListener = null;
 let historyListener = null;
 
-// NEW: Variables to track the current patient for notifications
+// Variables to track the current patient for notifications
 let myQueueId = null;
 let hasBeenNotified = false;
 
@@ -40,6 +40,8 @@ function initializeApp() {
     doctorLoginForm.addEventListener('submit', loginDoctor);
 }
 
+// ... (createFloatingParticles, showPage, showLoading, hideLoading functions are unchanged) ...
+
 function createFloatingParticles() {
     const container = document.getElementById('particles');
     if (!container) return;
@@ -54,7 +56,6 @@ function createFloatingParticles() {
     }
 }
 
-// Page Navigation
 function showPage(pageId) {
     const pages = ['homePage', 'patientPage', 'doctorPage', 'historyPage'];
     pages.forEach(page => {
@@ -71,12 +72,12 @@ function hideLoading() {
     document.getElementById('loadingOverlay').classList.add('hidden');
 }
 
+
 // --- AUTHENTICATION FUNCTIONS ---
 
 function loginUser(role) {
     if (role === 'patient') {
         currentRole = 'patient';
-        // NEW: Clear any previous patient tracking data
         myQueueId = null;
         hasBeenNotified = false;
         document.getElementById('patientName').textContent = `Welcome!`;
@@ -123,7 +124,6 @@ async function logout() {
     }
 }
 
-// NEW: Function for the patient's "Back to Home" button
 function backToHomeFromPatient() {
     currentRole = null;
     myQueueId = null;
@@ -158,7 +158,7 @@ function updateQueueDisplay() {
     }
 }
 
-// UPDATED: Now includes notification logic
+// UPDATED: Now calls the big notification
 function updatePatientQueueView() {
     const container = document.getElementById('queueTracker');
     container.innerHTML = '';
@@ -175,20 +175,17 @@ function updatePatientQueueView() {
         return (a.timestamp.seconds || 0) - (b.timestamp.seconds || 0);
     });
 
-    // NEW: Notification logic starts here
     if (myQueueId) {
         const myIndex = sortedQueue.findIndex(p => p.id === myQueueId);
-        // If the patient is at the front of the queue AND hasn't been notified yet
         if (myIndex === 0 && !hasBeenNotified) {
-            showNotification("You're next!", "Please be ready to proceed.", "success");
-            hasBeenNotified = true; // Set flag to prevent repeat notifications
+            // NEW: Call the big notification for the patient
+            showBigNotification("You're Next!", "Please be ready to proceed.", "🔔");
+            hasBeenNotified = true; 
         }
     }
-    // Notification logic ends here
 
     sortedQueue.forEach((patient, index) => {
         const card = document.createElement('div');
-        // Add a special highlight if this card is the current patient
         const isMe = patient.id === myQueueId;
         card.className = `rounded-xl p-4 transition-all duration-300 hover-scale ${isMe ? 'border-4 border-teal-400' : ''} ${patient.isEmergency ? 'emergency-glow' : 'normal-glow'}`;
         
@@ -216,11 +213,7 @@ function updatePatientQueueView() {
     });
 }
 
-// ... (The rest of the file from updateDoctorQueueView downwards is unchanged) ...
-// (For brevity, I'm omitting the rest of the functions as they are not changed in this step)
-// ...
-// ...
-// ...
+// ... (updateDoctorQueueView and updateDoctorStats are unchanged) ...
 
 function updateDoctorQueueView() {
     const container = document.getElementById('patientQueue');
@@ -285,12 +278,12 @@ function updateDoctorStats() {
     document.getElementById('completedToday').textContent = demoHistory.length;
 }
 
+
 document.getElementById('emergencyToggle').addEventListener('change', function() {
     const section = document.getElementById('emergencySection');
     section.classList.toggle('emergency-glow', this.checked);
 });
 
-// UPDATED: Now saves the patient's ID for tracking
 document.getElementById('checkInForm').addEventListener('submit', async function(e) {
     e.preventDefault();
     const formData = {
@@ -302,11 +295,9 @@ document.getElementById('checkInForm').addEventListener('submit', async function
     };
     showLoading();
     try {
-        // NEW: Capture the returned document reference
         const docRef = await db.collection('queue').add(formData);
-        // NEW: Save the ID for notification tracking
         myQueueId = docRef.id;
-        hasBeenNotified = false; // Reset notification status for the new session
+        hasBeenNotified = false;
         document.getElementById('patientName').textContent = `Welcome, ${formData.name}!`;
 
         hideLoading();
@@ -320,6 +311,7 @@ document.getElementById('checkInForm').addEventListener('submit', async function
     }
 });
 
+// UPDATED: Now calls the big notification
 async function markPatientDone(patientId) {
     showLoading();
     try {
@@ -328,20 +320,22 @@ async function markPatientDone(patientId) {
         if (!patientDoc.exists) throw new Error("Patient document not found!");
 
         const patientData = patientDoc.data();
-        const historyData = {
-            ...patientData,
-            completedAt: firebase.firestore.FieldValue.serverTimestamp()
-        };
-
+        const historyData = { ...patientData, completedAt: firebase.firestore.FieldValue.serverTimestamp() };
         const batch = db.batch();
         const historyRef = db.collection('history').doc(patientId);
         batch.set(historyRef, historyData);
         batch.delete(queueRef);
-        
         await batch.commit();
 
         hideLoading();
-        showNotification('Patient completed!', `${patientData.name} has been moved to history.`, 'success');
+        
+        // NEW: Show big notification to the doctor
+        const nextPatient = demoQueue.length > 1 ? demoQueue[1] : null;
+        if (nextPatient) {
+            showBigNotification("Queue Updated!", `${nextPatient.name} is now next in line.`, "➡️");
+        } else {
+            showBigNotification("Queue Cleared!", "There are no more patients waiting.", "✅");
+        }
 
     } catch (error) {
         hideLoading();
@@ -349,6 +343,8 @@ async function markPatientDone(patientId) {
         showNotification("Operation Failed", "Could not process the patient.", "error");
     }
 }
+
+// ... (showHistory, backToDashboard, renderHistory functions are unchanged) ...
 
 function showHistory() {
     showPage('historyPage');
@@ -424,6 +420,9 @@ function renderHistory() {
     });
 }
 
+
+// --- NOTIFICATION SYSTEMS ---
+
 function showNotification(title, message, type = 'success') {
     const toast = document.getElementById('notificationToast');
     const icon = document.getElementById('toastIcon');
@@ -445,5 +444,20 @@ function showNotification(title, message, type = 'success') {
     
     setTimeout(() => {
         toast.classList.add('hidden');
+    }, 4000);
+}
+
+// NEW: Function to show the big notification overlay
+function showBigNotification(title, message, icon) {
+    const notification = document.getElementById('bigNotification');
+    document.getElementById('bigNotificationTitle').textContent = title;
+    document.getElementById('bigNotificationMessage').textContent = message;
+    document.getElementById('bigNotificationIcon').textContent = icon;
+
+    notification.classList.remove('hidden');
+
+    // Automatically hide after 4 seconds
+    setTimeout(() => {
+        notification.classList.add('hidden');
     }, 4000);
 }
