@@ -15,6 +15,10 @@ let currentRole = null;
 let queueListener = null;
 let historyListener = null;
 
+// NEW: Variables to track the current patient for notifications
+let myQueueId = null;
+let hasBeenNotified = false;
+
 // These arrays will be populated with LIVE data from Firebase
 let demoQueue = []; 
 let demoHistory = [];
@@ -32,7 +36,6 @@ function initializeApp() {
     auth = firebase.auth();
     console.log("✅ Mid-Queue successfully connected to Firebase!");
 
-    // Set up the new doctor login form listener
     const doctorLoginForm = document.getElementById('doctorLoginForm');
     doctorLoginForm.addEventListener('submit', loginDoctor);
 }
@@ -68,23 +71,24 @@ function hideLoading() {
     document.getElementById('loadingOverlay').classList.add('hidden');
 }
 
-// --- AUTHENTICATION FUNCTIONS (UPDATED) ---
+// --- AUTHENTICATION FUNCTIONS ---
 
-// Handles the simple "Patient Portal" button click
 function loginUser(role) {
     if (role === 'patient') {
         currentRole = 'patient';
+        // NEW: Clear any previous patient tracking data
+        myQueueId = null;
+        hasBeenNotified = false;
+        document.getElementById('patientName').textContent = `Welcome!`;
         showPage('patientPage');
         startQueueListener();
         showNotification('Welcome!', 'You are viewing the patient portal.', 'info');
     }
 }
 
-// Handles the new Doctor Login form
 async function loginDoctor(e) {
     e.preventDefault();
     showLoading();
-
     const email = document.getElementById('doctorEmail').value;
     const password = document.getElementById('doctorPassword').value;
 
@@ -92,13 +96,11 @@ async function loginDoctor(e) {
         const userCredential = await auth.signInWithEmailAndPassword(email, password);
         currentUser = userCredential.user;
         currentRole = 'doctor';
-
         hideLoading();
         document.getElementById('doctorName').textContent = currentUser.email;
         showPage('doctorPage');
         startQueueListener();
         showNotification('Login Successful!', `Welcome back, ${currentUser.email}`, 'success');
-
     } catch (error) {
         hideLoading();
         console.error("Authentication Error:", error.code, error.message);
@@ -106,7 +108,6 @@ async function loginDoctor(e) {
     }
 }
 
-// Uses Firebase to sign the user out
 async function logout() {
     try {
         await auth.signOut();
@@ -114,7 +115,6 @@ async function logout() {
         currentRole = null;
         if (queueListener) queueListener(); 
         if (historyListener) historyListener();
-        
         showPage('homePage');
         showNotification('Logged out', 'See you next time!', 'info');
     } catch (error) {
@@ -123,8 +123,16 @@ async function logout() {
     }
 }
 
+// NEW: Function for the patient's "Back to Home" button
+function backToHomeFromPatient() {
+    currentRole = null;
+    myQueueId = null;
+    hasBeenNotified = false;
+    if (queueListener) queueListener();
+    showPage('homePage');
+}
+
 // --- QUEUE & HISTORY MANAGEMENT ---
-// (No changes to these functions)
 
 function startQueueListener() {
     if (queueListener) queueListener(); 
@@ -150,6 +158,7 @@ function updateQueueDisplay() {
     }
 }
 
+// UPDATED: Now includes notification logic
 function updatePatientQueueView() {
     const container = document.getElementById('queueTracker');
     container.innerHTML = '';
@@ -166,9 +175,22 @@ function updatePatientQueueView() {
         return (a.timestamp.seconds || 0) - (b.timestamp.seconds || 0);
     });
 
+    // NEW: Notification logic starts here
+    if (myQueueId) {
+        const myIndex = sortedQueue.findIndex(p => p.id === myQueueId);
+        // If the patient is at the front of the queue AND hasn't been notified yet
+        if (myIndex === 0 && !hasBeenNotified) {
+            showNotification("You're next!", "Please be ready to proceed.", "success");
+            hasBeenNotified = true; // Set flag to prevent repeat notifications
+        }
+    }
+    // Notification logic ends here
+
     sortedQueue.forEach((patient, index) => {
         const card = document.createElement('div');
-        card.className = `rounded-xl p-4 transition-all duration-300 hover-scale ${patient.isEmergency ? 'emergency-glow' : 'normal-glow'}`;
+        // Add a special highlight if this card is the current patient
+        const isMe = patient.id === myQueueId;
+        card.className = `rounded-xl p-4 transition-all duration-300 hover-scale ${isMe ? 'border-4 border-teal-400' : ''} ${patient.isEmergency ? 'emergency-glow' : 'normal-glow'}`;
         
         const waitTime = patient.timestamp ? Math.max(0, Math.floor((Date.now() - (patient.timestamp.seconds * 1000)) / 60000)) : 0;
         const progressWidth = Math.min(100, (waitTime / 30) * 100);
@@ -177,7 +199,7 @@ function updatePatientQueueView() {
             <div class="flex items-center justify-between mb-3">
                 <div class="flex items-center space-x-3">
                     <div class="w-8 h-8 rounded-full ${patient.isEmergency ? 'bg-red-500' : 'bg-blue-500'} flex items-center justify-center text-white font-bold text-sm">${index + 1}</div>
-                    <div><h4 class="font-semibold text-white">${patient.name}</h4><p class="text-white/70 text-sm">${patient.reason}</p></div>
+                    <div><h4 class="font-semibold text-white">${patient.name} ${isMe ? '(You)' : ''}</h4><p class="text-white/70 text-sm">${patient.reason}</p></div>
                 </div>
                 ${patient.isEmergency ? '<span class="bg-red-500 text-white px-2 py-1 rounded-full text-xs font-medium">EMERGENCY</span>' : '<span class="bg-blue-500 text-white px-2 py-1 rounded-full text-xs font-medium">NORMAL</span>'}
             </div>
@@ -193,6 +215,12 @@ function updatePatientQueueView() {
         container.appendChild(card);
     });
 }
+
+// ... (The rest of the file from updateDoctorQueueView downwards is unchanged) ...
+// (For brevity, I'm omitting the rest of the functions as they are not changed in this step)
+// ...
+// ...
+// ...
 
 function updateDoctorQueueView() {
     const container = document.getElementById('patientQueue');
@@ -262,6 +290,7 @@ document.getElementById('emergencyToggle').addEventListener('change', function()
     section.classList.toggle('emergency-glow', this.checked);
 });
 
+// UPDATED: Now saves the patient's ID for tracking
 document.getElementById('checkInForm').addEventListener('submit', async function(e) {
     e.preventDefault();
     const formData = {
@@ -273,7 +302,13 @@ document.getElementById('checkInForm').addEventListener('submit', async function
     };
     showLoading();
     try {
-        await db.collection('queue').add(formData);
+        // NEW: Capture the returned document reference
+        const docRef = await db.collection('queue').add(formData);
+        // NEW: Save the ID for notification tracking
+        myQueueId = docRef.id;
+        hasBeenNotified = false; // Reset notification status for the new session
+        document.getElementById('patientName').textContent = `Welcome, ${formData.name}!`;
+
         hideLoading();
         this.reset();
         document.getElementById('emergencySection').classList.remove('emergency-glow');
