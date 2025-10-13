@@ -1,3 +1,9 @@
+# Mid-Queue  
+Smart Healthcare Queue Management System (Live Demo Open)  
+
+➡️ **[Try it live!](https://midqueue.netlify.app/)**  
+
+---
 # 🏥 Mid-Queue – Smart Healthcare Queue Management System
 
 Mid-Queue is a **real-time healthcare queue management web app** that helps doctors and patients manage appointments seamlessly.  
